@@ -189,8 +189,8 @@ if __name__=='__main__':
             wav = np.array(wav, dtype = np.float64)
             labels = np.array(labels)
 
-            # If wav file is not in original train / test input
-            if labels[0] == -1 or labels[0] >= emo_targets.size(0):
+            # If emotion is not neutral continue
+            if labels[0] != 0:
                 continue
 
             # Temporary: @eric-zhizu, if speaker is <= 10, it is Chinese so skip
