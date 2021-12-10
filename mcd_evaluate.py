@@ -93,9 +93,10 @@ if __name__=='__main__':
     # with open('neutral_mappings.pkl', 'rb') as f:
     #     neutral_to_emo_dict = pickle.load(f)
 
-    with open('neutral_mappings.pkl', 'rb') as f:
-        neutral_to_emo_dict = pickle.load(f)
-    print("Loaded neutral_mappings.pkl, mappings from neutral audio to emotional audio")
+    with open('file_emo_mappings.pkl', 'rb') as f:
+        file_emo_mapping_dict = pickle.load(f)
+
+    print("Loaded file_emo_mappings.pkl, mappings label to filenames")
 
     #fix seeds to get consistent results
     SEED = 42
@@ -192,7 +193,7 @@ if __name__=='__main__':
             labels = np.array(labels)
 
             # If wav file is not in original train / test input
-            if labels[0] == -1 or labels[0] >= emo_targets.size(0):
+            if labels[0] != 0:
                 continue
 
             # Temporary: @eric-zhizu, if speaker is <= 10, it is Chinese so skip
@@ -244,12 +245,13 @@ if __name__=='__main__':
                     fake = model.G(coded_sp, emo_embedding_target.unsqueeze(0))
 
                     ind2emo = {0: 'Neutral', 1: 'Happy', 2: 'Sad'}
-
-                    if filefront in neutral_to_emo_dict \
-                            and (ind2emo[i] in neutral_to_emo_dict[filefront] or i == 0):
-
+                    
+                    #if the file is in the emotion mapping dictionary
+                    if filefront in file_emo_mapping_dict \
+                            and (ind2emo[i] in file_emo_mapping_dict[filefront] or i == 0):
+                        
                         if i != 0:
-                            ref_wav_filefront = neutral_to_emo_dict[filefront][ind2emo[i]]
+                            ref_wav_filefront = file_emo_mapping_dict[filefront][ind2emo[i]]
                             input_wav_path = os.path.join(data_dir, ref_wav_filefront + '.wav')
 
                         if not os.path.exists(input_wav_path):
