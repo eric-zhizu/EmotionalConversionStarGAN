@@ -54,8 +54,10 @@ class Solver(object):
 
         # These are the INITIAL lr's. They are updated within the optimizers
         # over the training iterations
-        self.g_lr = self.config['optimizer']['g_lr']
-        self.d_lr = self.config['optimizer']['d_lr']
+        # self.g_lr = self.config['optimizer']['g_lr']
+        # self.d_lr = self.config['optimizer']['d_lr']
+        self.g_lr = 0.000004
+        self.d_lr = 0.000004
         self.emo_lr = self.config['optimizer']['emo_cls_lr']
         self.speaker_lr = self.config['optimizer']['speaker_cls_lr']
         self.dim_lr = self.config['optimizer']['dim_cls_lr']
@@ -76,9 +78,12 @@ class Solver(object):
 
         self.batch_size = self.config['model']['batch_size']
 
-        self.num_iters = self.config['loss']['num_iters']
-        self.num_iters_decay = self.config['loss']['num_iters_decay']
-        self.resume_iters = self.config['loss']['resume_iters']
+        # self.num_iters = self.config['loss']['num_iters']
+        self.num_iters = 730000
+        # self.num_iters_decay = self.config['loss']['num_iters_decay']
+        self.num_iters_decay = 200000
+        # self.resume_iters = self.config['loss']['resume_iters']
+        self.resume_iters = 530000
         self.current_iter = self.resume_iters
 
         # Number of D/emo_cls updates for each G update
@@ -130,6 +135,7 @@ class Solver(object):
             print("Iteration {:02} lr = {:.6f}".format(i, self.model.d_optimizer.param_groups[0]['lr']))
             self.model.to_device(device=self.device)
             print("Device is ", self.device)
+            # @eric-zhizu: Only using emo_cls's output_mlp
             print("Classifier device is ", self.model.emo_cls.device)
             self.model.set_train_mode()
 
@@ -138,18 +144,20 @@ class Solver(object):
             # Get data from data loader
             print('Getting mini-batch.')
             try:
-                x, labels = next(data_iter)
+                x, emo_embeddings, labels = next(data_iter)
             except:
                 # print("In here")
                 data_iter = iter(self.train_loader)
-                x, labels = next(data_iter)
+                x, emo_embeddings, labels = next(data_iter)
 
             x_real = x[0].to(device = self.device).unsqueeze(1)
             x_lens = x[1].to(device = self.device)
             print(f"solver.train: x_real size = {x_real.size()}")
 
             emo_labels = labels[:, 0].to(device=self.device)
-            spk_labels = labels[:, 1].to(device=self.device)
+
+            # @eric-zhizu: Not used
+            spk_labels = None
             # ;;;;;;; GET DIM LABELS
 
             # Generate target domain labels randomly.
@@ -157,53 +165,16 @@ class Solver(object):
             emo_targets = self.make_random_labels(num_emos, emo_labels.size(0))
             emo_targets = emo_targets.to(device=self.device)
 
+            # emotion embeddings: (batch_size, num_emos, 768) ==> (batch_size, 768)
+            emo_embedding_source = emo_embeddings[torch.arange(emo_embeddings.size(0)), emo_labels, :]
+            emo_embedding_target = emo_embeddings[torch.arange(emo_embeddings.size(0)), emo_targets, :]
+
             # one-hot versions of labels
             emo_labels_ones = F.one_hot(emo_labels, num_classes=num_emos).float().to(device=self.device)
             emo_targets_ones = F.one_hot(emo_targets, num_classes=num_emos).float().to(device=self.device)
 
-            #############################################################
-            #                    TRAIN CLASSIFIERS                      #
-            #############################################################
             ce_weighted_loss_fn = nn.CrossEntropyLoss(weight=self.emo_loss_weights)
             ce_loss_fn = nn.CrossEntropyLoss()
-
-            if self.config['loss']['train_classifier'] and not self.recon_only:
-                print('Training Classifiers...')
-
-                self.model.reset_grad()
-
-                # Train with x_real
-                preds_emo_real = self.model.emo_cls(x_real, x_lens)
-
-                c_emo_real_loss = ce_weighted_loss_fn(preds_emo_real, emo_labels)
-
-                c_emo_real_loss.backward()
-                self.model.emo_cls_optimizer.step()
-
-                if self.model.use_speaker:
-                    self.model.reset_grad()
-
-                    # Train with x_real
-                    preds_speaker_real = self.model.speaker_cls(x_real, x_lens)
-
-                    c_speaker_real_loss = ce_loss_fn(preds_speaker_real, spk_labels)
-
-                    c_speaker_real_loss.backward()
-                    self.model.speaker_cls_optimizer.step()
-
-                if self.model.use_dimension:
-                    self.model.reset_grad()
-
-                    # Train with x_real
-                    preds_dimension_real = self.model.dimension_cls(x_real, x_lens)
-
-                    # ;;; DO FOR MULTILABEL
-                    c_dimension_real_loss = ce_loss_fn(preds_dimension_real, dim_labels)
-
-                    c_dimension_real_loss.backward()
-                    self.model.speaker_cls_optimizer.step()
-            else:
-                print('No classifier training this run.')
 
             #############################################################
             #                    TRAIN DISCRIMINATOR                    #
@@ -213,7 +184,7 @@ class Solver(object):
                 self.model.reset_grad()
 
                 # Get results for x_fake
-                x_fake = self.model.G(x_real, emo_targets_ones)
+                x_fake = self.model.G(x_real, emo_embedding_target)
                 # ;;; GET NEW X_LENS HERE
 
                 # Get real/fake predictions
@@ -241,12 +212,12 @@ class Solver(object):
 
                 self.model.reset_grad()
 
-                x_fake = self.model.G(x_real, emo_targets_ones)
+                x_fake = self.model.G(x_real, emo_embedding_target)
                 # ;;; GET NEW X_LENS HERE
                 x_fake_lens = x_lens
 
-                x_cycle = self.model.G(x_fake, emo_labels_ones)
-                x_id = self.model.G(x_real, emo_labels_ones)
+                x_cycle = self.model.G(x_fake, emo_embedding_source)
+                x_id = self.model.G(x_real, emo_embedding_source)
                 d_preds_for_g = self.model.D(x_fake, emo_targets_ones)
 
                 # x_cycle = self.make_equal_length(x_cycle, x_real)
@@ -261,6 +232,7 @@ class Solver(object):
                 g_loss = loss_g_fake + self.lambda_id * loss_id + self.lambda_cycle * loss_cycle
 
                 if not self.recon_only:
+
                     preds_emo_fake = self.model.emo_cls(x_fake, x_fake_lens)
                     loss_g_emo_cls = ce_weighted_loss_fn(preds_emo_fake, emo_targets)
                     g_loss += self.lambda_g_emo_cls * loss_g_emo_cls
@@ -358,7 +330,7 @@ class Solver(object):
         total_cycle = torch.rand(0).to(device=self.device, dtype=torch.float)
         l1_loss_fn = nn.L1Loss()
 
-        for i, (x, labels) in enumerate(self.test_loader):
+        for i, (x, emo_embeddings, labels) in enumerate(self.test_loader):
 
             x_real = x[0].to(device=self.device)
             x_lens = x[1].to(device=self.device)
@@ -366,12 +338,18 @@ class Solver(object):
             x_real = x_real.unsqueeze(1)
 
             emo_labels = labels[:, 0].to(device=self.device)
-            spk_labels = labels[:, 1].to(device=self.device)
+
+            # @eric-zhizu: Not used
+            spk_labels = None
 
             # Generate target domain labels randomly.
             num_emos = self.config['model']['num_classes']
             emo_targets = self.make_random_labels(num_emos, emo_labels.size(0))
             emo_targets = emo_targets.to(device=self.device)
+
+            # emotion embeddings: (batch_size, num_emos, 768) ==> (batch_size, 768)
+            emo_embedding_source = emo_embeddings[torch.arange(emo_embeddings.size(0)), emo_labels, :]
+            emo_embedding_target = emo_embeddings[torch.arange(emo_embeddings.size(0)), emo_targets, :]
 
             # one-hot versions of labels
             emo_labels_ones = F.one_hot(emo_labels, num_classes=num_emos).float().to(device=self.device)
@@ -379,9 +357,9 @@ class Solver(object):
 
             with torch.no_grad():
 
-                x_fake = self.model.G(x_real, emo_targets_ones)
-                x_id = self.model.G(x_real, emo_labels_ones)
-                x_cycle = self.model.G(x_fake, emo_labels_ones)
+                x_fake = self.model.G(x_real, emo_embedding_target)
+                x_id = self.model.G(x_real, emo_embedding_source)
+                x_cycle = self.model.G(x_fake, emo_embedding_source)
 
                 new_lens = x_lens #;;; needs doing
 

@@ -1,7 +1,7 @@
 """
 main.py
 
-Author - Max Elliott
+Authors - Max Elliott, Eric Zhou
 
 Main script to start training of the proposed model (StarGAN_emo_VC1).
 
@@ -25,8 +25,8 @@ import numpy as np
 import random
 import os
 
-import stargan.my_dataset as my_dataset
-from stargan.my_dataset import get_filenames
+import stargan.embed_dataset as my_dataset
+from stargan.embed_dataset import get_filenames
 import stargan.solver as solver
 
 def make_weight_vector(filenames, data_dir):
@@ -126,8 +126,9 @@ if __name__ == '__main__':
 
     # print(np.load(data_dir + "/" + files[0] + ".npy").shape)
 
-    train_dataset = my_dataset.MyDataset(config, train_files)
-    test_dataset = my_dataset.MyDataset(config, test_files)
+    # @eric-zhizu: change the dataset
+    train_dataset = my_dataset.EmbedDataset(config, train_files)
+    test_dataset = my_dataset.EmbedDataset(config, test_files)
 
     batch_size = config['model']['batch_size']
 

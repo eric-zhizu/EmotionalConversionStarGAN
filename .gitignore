@@ -4,5 +4,7 @@
 /samples/
 /logs/
 /stdout.txt
-pretrained_models
-wav2vec2_checkpoints
+/wav2vec2_checkpoints/
+/pretrained_models/
+emo_embeddings.pt
+

@@ -21,6 +21,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 import random
 import os
+from tqdm import tqdm
 import yaml
 import argparse
 import librosa
@@ -65,7 +66,7 @@ def load_checkpoint(model, optimiser, filename='./checkpoints/cls_checkpoint.ckp
     return epoch
 
 def train_model(model, optimiser, train_data_loader, val_data_loader, loss_fn,
-                model_type='cls', epochs=1, print_every=10, var_len_data = False, start_epoch = 1):
+                model_type='cls', epochs=1, print_every=1, var_len_data = False, start_epoch = 1):
 
     model = model.to(device=device) # move the model parameters to CPU/GPU
 
@@ -76,7 +77,7 @@ def train_model(model, optimiser, train_data_loader, val_data_loader, loss_fn,
 
         total_loss = 0
 
-        for t, (x, y) in enumerate(train_data_loader):
+        for t, (x, y) in tqdm(enumerate(train_data_loader)):
             model.train()  # put model to training mode
 
             if(var_len_data):
@@ -114,7 +115,7 @@ def train_model(model, optimiser, train_data_loader, val_data_loader, loss_fn,
 
             # print("Epoch ", e, ", iteration", t, " done.")
 
-        if t % print_every == 0:
+        if e % print_every == 0:
 
             print(f'| Epoch: {e:02} | Train Loss: {total_loss:.3f}')
 
@@ -255,7 +256,7 @@ if __name__=='__main__':
     input_size = 36
     num_layers = 2
 
-    config = yaml.safe_load(open('./config.yaml', 'r'))
+    config = yaml.safe_load(open('./config_extension.yaml', 'r'))
 
     # MAKE TRAIN + TEST SPLIT
     mel_dir = os.path.join(config['data']['dataset_dir'], "world")
