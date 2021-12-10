@@ -249,7 +249,8 @@ if __name__=='__main__':
                     #if the file is in the emotion mapping dictionary
                     if filefront in file_emo_mapping_dict \
                             and (ind2emo[i] in file_emo_mapping_dict[filefront] or i == 0):
-                        
+                        if i == 0:
+                            ref_wav_filefront = filefront
                         if i != 0:
                             ref_wav_filefront = file_emo_mapping_dict[filefront][ind2emo[i]]
                             input_wav_path = os.path.join(data_dir, ref_wav_filefront + '.wav')
