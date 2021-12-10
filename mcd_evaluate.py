@@ -244,8 +244,8 @@ if __name__=='__main__':
 
                     fake = model.G(coded_sp, emo_embedding_target.unsqueeze(0))
 
-                    ind2emo = {0: 'Neutral', 1: 'Happy', 2: 'Sad'}
-                    print(ind2emo[i])
+                    ind2emo = {0: 'Neutral', 1: 'Angry', 2: 'Happy', 3: 'Sad'}
+
                     #if the file is in the emotion mapping dictionary
                     if filefront in file_emo_mapping_dict \
                             and (ind2emo[i] in file_emo_mapping_dict[filefront] or i == 0):
