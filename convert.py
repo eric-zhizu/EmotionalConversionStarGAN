@@ -56,6 +56,7 @@ if __name__=='__main__':
     parser.add_argument('-out', '--out_dir', type=str)
     # parser.add_argument('-i', '--iteration', type = str)
     parser.add_argument('-c', '--checkpoint', type=str, help='Checkpoint file of model')
+    parser.add_argument('-t', '--test', action='store_true', help='Only test files if set')
     # parser.add_argument('-n', '--num_emotions', type = int, default = None)
     # parser.add_argument('-f', '--features'), type = str,
                         # help = "mel or world features.")
@@ -252,7 +253,8 @@ if __name__=='__main__':
             if (file_num+1) % 20 == 0:
                 print(file_num+1, " done.")
 
-    convert_files(train_wav_files, "train")
+    if not args.test:
+        convert_files(train_wav_files, "train")
     convert_files(test_wav_files, "test")
 
     ########################################
