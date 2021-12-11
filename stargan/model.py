@@ -1,11 +1,8 @@
 """
 model.py
-
 Author - Max Elliott
-
 Contains the full proposed model (the adapted StarGAN-VC model for spectral
 envelope conversion).
-
 Note: Generator_World is the generator used for all experiments and the one
 described in the report. Generator_Mel was only an alternative that never got
 used.
@@ -226,16 +223,13 @@ class StarGAN_emo_VC1(object):
         self.D.load_state_dict(dictionary['D'])
         self.G.load_state_dict(dictionary['G'])
 
-        # @eric-zhizu: Commented out, loaded from load_pretrained_classifier
-        # self.emo_cls.load_state_dict(dictionary['emo'])
+        #self.emo_cls.load_state_dict(dictionary['emo'])
 
         # self.d_optimizer.load_state_dict(dictionary['d_opt'])
         # self.g_optimizer.load_state_dict(dictionary['g_opt'])
         # self.emo_cls_optimizer.load_state_dict(dictionary['emo_opt'])
 
         con_opt = self.config['optimizer']
-        con_opt['g_lr'] = 0.000004
-        con_opt['d_lr'] = 0.000004
         self.g_optimizer = torch.optim.Adam(self.G.parameters(), con_opt['g_lr'], [con_opt['beta1'], con_opt['beta2']])
         self.d_optimizer = torch.optim.Adam(self.D.parameters(), con_opt['d_lr'], [con_opt['beta1'], con_opt['beta2']])
         self.emo_cls_optimizer = torch.optim.Adam(self.emo_cls.parameters(), con_opt['emo_cls_lr'], [con_opt['beta1'], con_opt['beta2']], weight_decay=0.000001)
@@ -333,10 +327,10 @@ class Generator_World(nn.Module):
         self.down4 = Down2d(128, 64, (5, 3), (1, 1), (2, 1))
         self.down5 = Down2d(64, 5, (5, 9), (1, 9), (2, 0))
 
-        self.up1 = Up2d(5, 64, (5, 9), (1, 9), (2, 0))
-        self.up2 = Up2d(64, 128, (5, 3), (1, 1), (2, 1))
+        self.up1 = Up2d(5 + self.emo_embed_size, 64, (5, 9), (1, 9), (2, 0))
+        self.up2 = Up2d(64 + self.emo_embed_size, 128, (5, 3), (1, 1), (2, 1))
         self.up3 = Up2d(128 + self.emo_embed_size, 64, (8, 4), (2, 2), (3, 1))
-        self.up4 = Up2d(64, 32, (8, 4), (2, 2), (3, 1))
+        self.up4 = Up2d(64 + self.emo_embed_size, 32, (8, 4), (2, 2), (3, 1))
 
         self.deconv = nn.ConvTranspose2d(32, 1, (9, 3), (1, 1), (4, 1))
 
@@ -351,8 +345,14 @@ class Generator_World(nn.Module):
 
         # emo_embedding: (batch_size, 768) ==> (batch_size, 768, 1, 1)
         emo_embedding = emo_embedding.view(emo_embedding.size(0), emo_embedding.size(1), 1, 1)
+        emo_embedding_expanded = emo_embedding.repeat(1, 1, x.size(2), x.size(3))
+        x = torch.cat([x, emo_embedding_expanded], dim=1)
 
         x = self.up1(x)
+
+       # emo_embedding = emo_embedding.view(emo_embedding.size(0), emo_embedding.size(1), 1, 1)
+        emo_embedding_expanded = emo_embedding.repeat(1, 1, x.size(2), x.size(3))
+        x = torch.cat([x, emo_embedding_expanded], dim=1)
 
         x = self.up2(x)
 
@@ -364,7 +364,13 @@ class Generator_World(nn.Module):
 
         #c4 = c.repeat(1,1,x.size(2), x.size(3))
         #x = torch.cat([x, c4], dim=1)
+        emo_embedding_expanded = emo_embedding.repeat(1, 1, x.size(2), x.size(3))
+        x = torch.cat([x, emo_embedding_expanded], dim=1)
+
         x = self.up4(x)
+        
+        #emo_embedding_expanded = emo_embedding.repeat(1, 1, x.size(2), x.size(3))
+        #x = torch.cat([x, emo_embedding_expanded], dim=1)
 
         #c5 = c.repeat(1,1, x.size(2), x.size(3))
         #x = torch.cat([x, c5], dim=1)
